@@ -6,8 +6,8 @@ defmodule OpenPlaatoKeg.KegDataProcessor do
   alias OpenPlaatoKeg.PlaatoData
   alias OpenPlaatoKeg.PlaatoProtocol
 
-  def start_link(_ \\ %{}) do
-    GenServer.start_link(__MODULE__, [], name: __MODULE__)
+  def start_link(init_arg \\ %{}) do
+    GenServer.start_link(__MODULE__, init_arg)
   end
 
   def init(state) do
