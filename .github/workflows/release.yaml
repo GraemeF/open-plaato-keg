@@ -73,6 +73,7 @@ jobs:
 
       - name: Build and push Docker images
         run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           if [ "${{ github.ref_name }}" = "master" ]; then
             DOCKER_TAG="latest"
           else
@@ -80,6 +81,6 @@ jobs:
           fi
           docker buildx create --use
           docker buildx build --platform linux/amd64,linux/arm64 \
-            -t ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }} \
-            -t ghcr.io/${{ github.repository }}:${DOCKER_TAG} \
+            -t ghcr.io/${REPO}:${{ steps.version.outputs.version }} \
+            -t ghcr.io/${REPO}:${DOCKER_TAG} \
             --push .
