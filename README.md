@@ -2,6 +2,73 @@
 
 Take control of your Plaato Keg! This reverse-engineered solution bypasses the Plaato cloud, keeping your keg data local and accessible even after the cloud service is discontinued.
 
+## 🆕 Next Branch - New Features and Changes
+
+The `next` branch contains upcoming features that are still in development. Install using the `next` Docker tag:
+
+```bash
+docker run --rm -it -p 1234:1234 -p 8085:8085 ghcr.io/sklopivo/open-plaato-keg:next
+```
+
+### New Features
+
+- **Multi-Architecture Docker Images** - Native support for `linux/amd64` and `linux/arm64` (Raspberry Pi 4/5, Apple Silicon, AWS Graviton)
+
+- **Keg Setup Page (`/setup.html`)** - Full-featured web UI to configure and control your keg:
+  - **Units & Mode**: Switch between Metric/US units, Weight/Volume display mode
+  - **Scale Sensitivity**: Adjust pour detection sensitivity (4 levels)
+  - **Calibration**: Tare scale, set empty keg weight, calibrate with known weight, temperature offset
+  - **Beer Information**: Set beer style, keg date, OG, FG, ABV calculation, max keg volume (stored locally)
+  - **System Status**: View device info, WiFi signal, firmware version, chip temperature, leak detection
+
+- **Keg Command API** - New REST endpoints to send commands to connected kegs:
+  - `POST /api/kegs/:id/tare` - Tare the scale
+  - `POST /api/kegs/:id/empty-keg` - Set empty keg weight
+  - `POST /api/kegs/:id/max-keg-volume` - Set max volume
+  - `POST /api/kegs/:id/temperature-offset` - Adjust temperature reading
+  - `POST /api/kegs/:id/calibrate-known-weight` - Calibrate with known weight
+  - `POST /api/kegs/:id/beer-style` - Set beer style name
+  - `POST /api/kegs/:id/date` - Set keg date
+  - `POST /api/kegs/:id/og` - Set original gravity (format: 1.xxx)
+  - `POST /api/kegs/:id/fg` - Set final gravity (format: 1.xxx)
+  - `POST /api/kegs/:id/abv` - Calculate ABV from OG and FG
+  - `POST /api/kegs/:id/unit` - Set unit system (metric/us)
+  - `POST /api/kegs/:id/measure-unit` - Set measure mode (weight/volume)
+  - `POST /api/kegs/:id/keg-mode` - Set keg mode (beer/co2) *experimental*
+  - `POST /api/kegs/:id/sensitivity` - Set scale sensitivity
+  - `GET /api/kegs/connected` - List currently connected kegs
+
+- **Improved Home Page (`/index.html`)**:
+  - Real-time updates via WebSocket
+  - Shows beer style and keg date as card title
+  - Temperature badge, pouring indicator, last pour, remaining percentage
+  - Modern dark theme with amber accents
+
+- **Hardware Calibration** - Tare and calibration commands are sent directly to the keg hardware via Blynk protocol, ensuring accurate readings stored on the device itself
+
+- **Live Pouring Detection** - Real-time `is_pouring` property emitted via WebSocket, enabling instant pour notifications and UI updates
+
+- **Enhanced Data Model** - Decodes all known Plaato Keg pins:
+  - Amount left, percent remaining, last pour
+  - Temperature (keg and chip)
+  - WiFi signal strength, firmware version
+  - Leak detection, min/max temperature alerts
+
+### Changes from Master
+
+- Removed old `/config.html` page (replaced by `/setup.html`)
+- Removed client-side calibration models (now handled via keg commands)
+- Simplified data flow - raw keg data stored directly
+- Added `KegCommander` module for bi-directional keg communication
+- Added `KegSocketRegistry` to track connected keg sockets
+- Prerelease versioning for `next` branch (e.g., `0.0.9-next.1`)
+
+### Experimental Features (⚠️ Use with Caution)
+
+- **CO₂ Mode** - Switch to CO₂ monitoring mode (pins not fully decoded)
+- **Scale Sensitivity** - No read feedback from keg for current setting
+- **Beer Style/Date/OG/FG/ABV** - Stored in local database (keg doesn't echo these values back)
+
 ## Why this exists?
 
 Plaato has decided to stop manufacturing its homebrewing equipment (Airlock, Keg, and Valve). Additionally, the company will shut down the cloud backend that provides data storage and enables the Plaato app to function ([announcement](https://plaato.io/plaato-for-homebrewers/?srsltid=AfmBOop1NiIPtQioYXJ0XWwf53s8FH0wi4M0VTfMo7vrXYixXQ1ITaOk)). This means the app will **cease to work after November 2025**, effectively ending the usability of the devices as they are currently designed.
@@ -68,6 +135,14 @@ http://192.168.4.1/config?ssid=My+Wifi&pass=my_password&blynk=000000000000000000
 
 Docker images are built on Github Container Registry (`ghcr.io`).
 
+**Supported architectures:** `linux/amd64`, `linux/arm64`
+
+This means images work on:
+- Standard x86_64 servers and PCs
+- Raspberry Pi 4/5 (64-bit OS)
+- Apple Silicon Macs (M1/M2/M3)
+- AWS Graviton instances
+
 Image:
 * `ghcr.io/sklopivo/open-plaato-keg:latest` or tagged by semantic version  - eg. `ghcr.io/sklopivo/open-plaato-keg:x.y.z`
 
@@ -112,42 +187,107 @@ If Docker isn't your preferred method, you can create an [Elixir Release](https:
 
 ### Environment variables
 
-| Name                        | Requirement | Default Value                                                   |
-|-----------------------------|-------------|-----------------------------------------------------------------|
-| KEG_LISTENER_PORT           | Optional   | 1234                                                            |
-| HTTP_LISTENER_PORT          | Optional   | 8085                                                            |
-| DATABASE_FILE_PATH          | Optional    | priv/db/keg_data.bin                                            |
-| MQTT_ENABLED                | Optional    | false                                                           |
-| MQTT_HOST                   | Optional    | localhost                                                       |
-| MQTT_PORT                   | Optional    | 1883                                                            |
-| MQTT_USERNAME               | Optional    | client                                                          |
-| MQTT_PASSWORD               | Optional    | client                                                          |
-| MQTT_CLIENT_ID              | Optional    | open_plaato_keg_local                                           |
-| MQTT_TOPIC                  | Optional    | plaato/keg                                                      |
-| BARHELPER_ENABLED           | Optional    | false                                                           |
-| BARHELPER_ENDPOINT          | Optional    | https://europe-west1-barhelper-app.cloudfunctions.net/api/customKegMon |
-| BARHELPER_API_KEY           | Optional    |                                                                 |
-| BARHELPER_UNIT              | Optional    | l                                                               |
-| BARHELPER_KEG_MONITOR_MAPPING | Optional  | plaato-auth-key:barhelper-custom-keg-monitor-id                 |
+| Name                          | Requirement | Default Value                                                   | Description |
+|-------------------------------|-------------|-----------------------------------------------------------------|-------------|
+| KEG_LISTENER_PORT             | Optional    | 1234                                                            | TCP port for Plaato Keg connections |
+| HTTP_LISTENER_PORT            | Optional    | 8085                                                            | HTTP port for web UI and API |
+| DATABASE_FILE_PATH            | Optional    | priv/db/keg_data.bin                                            | Path to persistent database file |
+| INCLUDE_UNKNOWN_DATA          | Optional    | false                                                           | Include unknown/undecoded pins in output |
+| MQTT_ENABLED                  | Optional    | false                                                            | Enable MQTT publishing |
+| MQTT_HOST                     | Optional    | localhost                                                       | MQTT broker hostname |
+| MQTT_PORT                     | Optional    | 1883                                                            | MQTT broker port |
+| MQTT_USERNAME                 | Optional    | client                                                          | MQTT username |
+| MQTT_PASSWORD                 | Optional    | client                                                          | MQTT password |
+| MQTT_CLIENT_ID                | Optional    | open_plaato_keg_local                                           | MQTT client identifier |
+| MQTT_TOPIC                    | Optional    | plaato/keg                                                      | Base MQTT topic prefix |
+| MQTT_JSON_OUTPUT              | Optional    | true                                                            | Publish all data as JSON to `{topic}/{keg_id}` |
+| MQTT_PROPERTY_OUTPUT          | Optional    | true                                                            | Publish each property to `{topic}/{keg_id}/{property}` |
+| BARHELPER_ENABLED             | Optional    | false                                                           | Enable BarHelper integration |
+| BARHELPER_ENDPOINT            | Optional    | https://europe-west1-barhelper-app.cloudfunctions.net/api/customKegMon | BarHelper API endpoint |
+| BARHELPER_API_KEY             | Optional    |                                                                 | Your BarHelper API key |
+| BARHELPER_UNIT                | Optional    | l                                                               | Unit for BarHelper (l = liters) |
+| BARHELPER_KEG_MONITOR_MAPPING | Optional    | plaato-auth-key:barhelper-custom-keg-monitor-id                 | Mapping of Plaato IDs to BarHelper monitors |
+
+#### MQTT Output Modes
+
+**MQTT_JSON_OUTPUT** (default: `true`)
+- Publishes the complete keg data as a single JSON object
+- Topic: `plaato/keg/{keg_id}`
+- Example payload:
+  ```json
+    {
+      "firmware_version": "2.0.10a",
+      "chip_temperature_string": "74.44°C",
+      "max_temperature": "30.000",
+      "min_temperature": "0.000",
+      "leak_detection": "0",
+      "volume_unit": "litre",
+      "wifi_signal_strength": "98",
+      "temperature_unit": "°C",
+      "beer_left_unit": "litre",
+      "keg_temperature_string": "22.87°C",
+      "fg": "1010",
+      "og": "1050",
+      "last_pour": "0.000",
+      "keg_temperature": "22.875",
+      "is_pouring": "255",
+      "percent_of_beer_left": "12.000",
+      "last_pour_string": "0.04L",
+      "temperature_offset": "-7.500",
+      "measure_unit": "2",
+      "max_keg_volume": "18.812",
+      "empty_keg_weight": "0.000",
+      "amount_left": "3.802",
+      "unit": "1",
+      "internal": {
+        "ver": "2.0.10a",
+        "tmpl": "TMPL57889",
+        "h-beat": "20",
+        "fw": "2.0.10a",
+        "dev": "ESP32",
+        "build": "Jul 20 2020 12:31:35",
+        "buff-in": "1024"
+      },
+      "id": "00000000000000000000000000000001",
+      "my_beer_style": "IPA",
+      "my_keg_date": "12.01.2025",
+      "my_og": "1.050",
+      "my_fg": "1.010",
+      "my_abv": "5.25"
+    }
+  ```
+
+**MQTT_PROPERTY_OUTPUT** (default: `false`)
+- Publishes each property to a separate subtopic
+- Topics: `plaato/keg/{keg_id}/{property_name}`
+- Example topics:
+  - `plaato/keg/abc123/amount_left` → `15.5`
+  - `plaato/keg/abc123/keg_temperature` → `4.2`
+  - `plaato/keg/abc123/percent_of_beer_left` → `12.0`
+  - `plaato/keg/abc123/my_og` → `1.050`
+  - `plaato/keg/abc123/my_fg` → `1.010`
+  - `plaato/keg/abc123/my_abv` → `5.25`
+- Useful for Home Assistant MQTT discovery or simple automations
+
+Both modes can be enabled simultaneously.
 
 
 ## Integrations
 
-### Rudimentary Web
+### Web Companion
 
-Merely a showcase how to interact with WebSocket and REST API.
+Showcase how to interact with WebSocket and REST API.
 
 ### `/index.html`
 
-* Displays your keg values in real time
+* Displays your keg values in real time with WebSocket updates
+* Shows beer style, keg date, temperature, pouring status, and remaining volume
 
-<img src=".readme/web-index.png" alt="Index" width="400"/>
+### `/setup.html`
 
-### `/config.html`
-
-* Configure your kegs
-
-<img src=".readme/web-config.png" alt="Config" width="400"/>
+* Configure and control your kegs
+* Set units, calibration, beer information, and view system status
+* Send commands directly to connected kegs
 
 ### HTTP REST API
 
@@ -159,33 +299,77 @@ Merely a showcase how to interact with WebSocket and REST API.
    * **Example Response:**
       ```json
         [
-          {
-            "temperature": 63.89,
-            "weight_calibrate": 0,
-            "temperature_calibrate": 0,
-            "full_weight": 19,
-            "temperature_raw_unit": "°C",
-            "temperature_raw": 63.89,
-            "weight_raw_unit": "kg",
-            "weight_raw": -0.06,
-            "weight": -0.06,
-            "name": "My keg",
-            "id": "00000000000000000000000000000001"
-          }
+           {
+              "firmware_version": "2.0.10a",
+              "chip_temperature_string": "74.44°C",
+              "max_temperature": "30.000",
+              "min_temperature": "0.000",
+              "leak_detection": "0",
+              "volume_unit": "litre",
+              "wifi_signal_strength": "98",
+              "temperature_unit": "°C",
+              "beer_left_unit": "litre",
+              "keg_temperature_string": "22.87°C",
+              "fg": "1010",
+              "og": "1050",
+              "last_pour": "0.000",
+              "keg_temperature": "22.875",
+              "is_pouring": "255",
+              "percent_of_beer_left": "12.000",
+              "last_pour_string": "0.04L",
+              "temperature_offset": "-7.500",
+              "measure_unit": "2",
+              "max_keg_volume": "18.812",
+              "empty_keg_weight": "0.000",
+              "amount_left": "3.802",
+              "unit": "1",
+              "internal": {
+                "ver": "2.0.10a",
+                "tmpl": "TMPL57889",
+                "h-beat": "20",
+                "fw": "2.0.10a",
+                "dev": "ESP32",
+                "build": "Jul 20 2020 12:31:35",
+                "buff-in": "1024"
+              },
+              "id": "00000000000000000000000000000001",
+              "my_beer_style": "IPA",
+              "my_keg_date": "12.01.2025",
+              "my_og": "1.050",
+              "my_fg": "1.010",
+              "my_abv": "5.25"
+            }
         ]
       ```
 * **Fields in Response:**
-    * `temperature`: Calculated temperature of the keg (`temperature_raw` + `temperature_calibrate`).
-    * `weight_calibrate`: Calibration offset for the weight.
-    * `temperature_calibrate`: Calibration offset for the temperature.
-    * `full_weight`: Weight of the keg when full in kilograms.
-    * `temperature_raw_unit`:  Unit of the raw temperature reading.
-    * `temperature_raw`: Raw temperature value from the sensor.
-    * `weight_raw_unit`: Unit of the raw weight reading.
-    * `weight_raw`: Raw weight value from the sensor.
-    * `name`: Name of the keg.
-    * `id`: Unique identifier for the keg.
-    * `weight`: Calculated weight of the keg (`weight_raw` + `weight_calibrate`)
+    * `id`: Unique identifier for the keg (32-character hex string from auth token)
+    * `amount_left`: Current amount of beer left in the keg
+    * `percent_of_beer_left`: Percentage of beer remaining (0-100)
+    * `max_keg_volume`: Maximum keg volume
+    * `empty_keg_weight`: Weight of the empty keg
+    * `last_pour`: Amount of the last pour
+    * `last_pour_string`: Formatted last pour with unit
+    * `is_pouring`: Pour status (0 = not pouring, non-zero = pouring)
+    * `keg_temperature`: Current keg temperature
+    * `keg_temperature_string`: Formatted temperature with unit
+    * `temperature_offset`: Temperature calibration offset
+    * `chip_temperature_string`: ESP32 chip temperature
+    * `unit`: Unit system (1 = Metric, 2 = US)
+    * `measure_unit`: Measure mode setting
+    * `beer_left_unit`: Display unit for beer amount (litre, kg, gal, lbs)
+    * `volume_unit`: Volume unit setting
+    * `temperature_unit`: Temperature unit (°C or °F)
+    * `wifi_signal_strength`: WiFi signal strength percentage
+    * `firmware_version`: Keg firmware version
+    * `leak_detection`: Leak detection status
+    * `min_temperature` / `max_temperature`: Temperature alert thresholds
+    * `og` / `fg`: Original and final gravity values (from hardware)
+    * `internal`: System info object (dev, ver, fw, build, tmpl, h-beat, buff-in)
+    * `my_beer_style`: User-defined beer style (stored locally)
+    * `my_keg_date`: User-defined keg date (stored locally)
+    * `my_og`: User-defined original gravity in format 1.xxx (stored locally)
+    * `my_fg`: User-defined final gravity in format 1.xxx (stored locally)
+    * `my_abv`: Calculated ABV percentage from OG and FG (stored locally)
 
 ### `/api/kegs/{keg_id}`
 
@@ -197,17 +381,44 @@ Merely a showcase how to interact with WebSocket and REST API.
     * **Example Response:**
        ```json
         {
-            "temperature": 63.89,
-            "weight_calibrate": 0,
-            "temperature_calibrate": 0,
-            "full_weight": 19,
-            "temperature_raw_unit": "°C",
-            "temperature_raw": 63.89,
-            "weight_raw_unit": "kg",
-            "weight_raw": -0.06,
-            "weight": -0.06,
-            "name": "My keg",
-            "id": "00000000000000000000000000000001"
+            "firmware_version": "2.0.10a",
+            "chip_temperature_string": "74.44°C",
+            "max_temperature": "30.000",
+            "min_temperature": "0.000",
+            "leak_detection": "0",
+            "volume_unit": "litre",
+            "wifi_signal_strength": "98",
+            "temperature_unit": "°C",
+            "beer_left_unit": "litre",
+            "keg_temperature_string": "22.87°C",
+            "fg": "1010",
+            "og": "1050",
+            "last_pour": "0.000",
+            "keg_temperature": "22.875",
+            "is_pouring": "255",
+            "percent_of_beer_left": "12.000",
+            "last_pour_string": "0.04L",
+            "temperature_offset": "-7.500",
+            "measure_unit": "2",
+            "max_keg_volume": "18.812",
+            "empty_keg_weight": "0.000",
+            "amount_left": "3.802",
+            "unit": "1",
+            "internal": {
+              "ver": "2.0.10a",
+              "tmpl": "TMPL57889",
+              "h-beat": "20",
+              "fw": "2.0.10a",
+              "dev": "ESP32",
+              "build": "Jul 20 2020 12:31:35",
+              "buff-in": "1024"
+            },
+            "id": "00000000000000000000000000000001",
+            "my_beer_style": "IPA",
+            "my_keg_date": "12.01.2025",
+            "my_og": "1.050",
+            "my_fg": "1.010",
+            "my_abv": "5.25"
         }
        ```
 * **Fields in Response:** Same as `/api/kegs`
@@ -215,31 +426,12 @@ Merely a showcase how to interact with WebSocket and REST API.
 ### `/api/kegs/devices`
 
 * **Method:** `GET`
-* **Description:**  Retrieves a list of the device IDs connected to the Plaato Keg system.
+* **Description:**  Retrieves a list of the device IDs connected/offline in the Plaato Keg system.
 * **Response:** An array of strings, where each string is a device ID.
    * **Example Response:**
       ```json
       ["00000000000000000000000000000001"]
       ```
-
-### `/api/kegs/calibrate`
-
-* **Method:** `POST`
-* **Description:** Calibrates a keg's settings.
-* **Request Body:** A JSON object with the following fields:
-    * `id`: The unique ID of the keg.
-    * `name`: The name of the keg.
-    * `full_weight`:  Weight of the keg when full.
-    * `weight_calibrate`: Calibration offset for the weight.
-    * `temperature_calibrate`: Calibration offset for the temperature.
-* **Example Request Body:**
-   ```json
-   {"id":"00000000000000000000000000000001","name":"My keg","full_weight":19,"weight_calibrate":0,"temperature_calibrate":-52}
-* **Response:**
-  * `201 Created` - when everything is ok
-  * `400 Bad Request` when parameters validation fails
-  * `500 Internal Server error` - when something is f***** up
-
 
 ### `/api/metrics`
 
@@ -248,16 +440,22 @@ Merely a showcase how to interact with WebSocket and REST API.
 * **Response**: `plaato_keg_weight` and `plaato_keg_temperature` are exposed alongside with Elixir metrics.
 
 ```
-# TYPE plaato_keg_weight gauge
-# HELP plaato_keg_weight Weight from Plaato Keg
-plaato_keg_weight{id="33bcbe756b994a6768494d55d1543c74",type="current",unit=""} 1.27
-plaato_keg_weight{id="33bcbe756b994a6768494d55d1543c74",type="calibrate",unit=""} 0
-plaato_keg_weight{id="33bcbe756b994a6768494d55d1543c74",type="raw",unit=""} 1.27
-# TYPE plaato_keg_temperature gauge
-# HELP plaato_keg_temperature Temperature from Plaato Keg
-plaato_keg_temperature{id="33bcbe756b994a6768494d55d1543c74",type="calibrate",unit="°C"} 0
-plaato_keg_temperature{id="33bcbe756b994a6768494d55d1543c74",type="current",unit="°C"} 72.78
-plaato_keg_temperature{id="33bcbe756b994a6768494d55d1543c74",type="raw",unit="°C"} 72.78
+plaato_keg{id="00000000000000000000000000000001",type="keg_temperature"} 23.0
+plaato_keg{id="00000000000000000000000000000001",type="leak_detection"} 0.0
+plaato_keg{id="00000000000000000000000000000001",type="og"} 1.0e3
+plaato_keg{id="00000000000000000000000000000001",type="max_keg_volume"} 19.0
+plaato_keg{id="00000000000000000000000000000001",type="last_pour"} 0.0
+plaato_keg{id="00000000000000000000000000000001",type="amount_left"} -0.1
+plaato_keg{id="00000000000000000000000000000001",type="max_temperature"} 30.0
+plaato_keg{id="00000000000000000000000000000001",type="min_temperature"} 0.0
+plaato_keg{id="00000000000000000000000000000001",type="temperature_offset"} -7.5
+plaato_keg{id="00000000000000000000000000000001",type="empty_keg_weight"} 0.0
+plaato_keg{id="00000000000000000000000000000001",type="measure_unit"} 2.0
+plaato_keg{id="00000000000000000000000000000001",type="fg"} 1.0e3
+plaato_keg{id="00000000000000000000000000000001",type="percent_of_beer_left"} 0.0
+plaato_keg{id="00000000000000000000000000000001",type="wifi_signal_strength"} 88.0
+plaato_keg{id="00000000000000000000000000000001",type="unit"} 1.0
+plaato_keg{id="00000000000000000000000000000001",type="is_pouring"} 0.0
 ```
 
 ### `/api/alive`
@@ -277,23 +475,7 @@ All updates can be received via websocket.
  }
 ```
 
-Message is in the same format as in API calls:
-
-```json
-{
-    "temperature": 63.89,
-    "weight_calibrate": 0,
-    "temperature_calibrate": 0,
-    "full_weight": 19,
-    "temperature_raw_unit": "°C",
-    "temperature_raw": 63.89,
-    "weight_raw_unit": "kg",
-    "weight_raw": -0.06,
-    "weight": -0.06,
-    "name": "My keg",
-    "id": "00000000000000000000000000000001"
-}
-```
+Message is in the same format as in API calls.
 
 ### MQTT (optional)
 
